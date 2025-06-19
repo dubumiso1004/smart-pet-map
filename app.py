@@ -110,7 +110,7 @@ def convert_to_grid(lat, lon):
     return int(x), int(y)
 
 # ---------------------------
-# 5. PET 예측 수식 (기초 회귀모델)
+# 5. PET 예측 수식
 # ---------------------------
 def predict_pet(svf, gvi, bvi, temp, hum, wind):
     return temp + (1 - svf) * 5 - gvi * 2 + bvi * 1.5 - wind * 0.5 + hum * 0.03
@@ -122,13 +122,16 @@ st.set_page_config(layout="centered")
 st.title("📍 PET 예측 시스템")
 st.markdown("지도를 클릭하면 가장 가까운 측정지점의 실측값과 **기상청 실시간 날씨**를 기반으로 PET를 예측합니다.")
 
-# 지도 생성 및 출력
+# 지도 생성 및 출력 (지도 먼저)
 center = [35.2325, 129.0840]
 m = folium.Map(location=center, zoom_start=17)
 folium.ClickForMarker(popup="선택 위치").add_to(m)
-map_data = st_folium(m, height=500, returned_objects=["last_clicked"], use_container_width=True)
+map_data = st_folium(m, height=500, returned_objects=["last_clicked"], use_container_width=False)
 
-# 지도 아래에 결과 출력
+# 지도와 결과 간 거리 줄이기
+st.markdown("<div style='margin-top: -40px;'></div>", unsafe_allow_html=True)
+
+# 클릭 처리
 if map_data and "last_clicked" in map_data and map_data["last_clicked"] is not None:
     clicked_lat = map_data["last_clicked"]["lat"]
     clicked_lon = map_data["last_clicked"]["lng"]
@@ -160,6 +163,5 @@ if map_data and "last_clicked" in map_data and map_data["last_clicked"] is not N
 
         st.markdown("### 🌡️ 예측 PET")
         st.markdown(f"**👉 `{pet:.1f}°C`**")
-
     else:
         st.warning("⚠️ 실시간 기상 데이터를 불러올 수 없습니다.")
