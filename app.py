@@ -125,7 +125,8 @@ st.markdown("지도를 클릭하면 가장 가까운 측정지점의 실측값�
 # 지도 생성
 center = [35.2325, 129.0840]
 m = folium.Map(location=center, zoom_start=17)
-map_data = st_folium(m, height=500)
+m.add_child(folium.LatLngPopup())
+map_data = st_folium(m, height=500, returned_objects=["last_clicked"])
 
 # 클릭 이벤트 처리
 if map_data and map_data.get("last_clicked"):
