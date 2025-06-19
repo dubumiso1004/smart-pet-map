@@ -122,24 +122,16 @@ st.set_page_config(layout="centered")
 st.title("📍 PET 예측 시스템")
 st.markdown("지도를 클릭하면 가장 가까운 측정지점의 실측값과 **기상청 실시간 날씨**를 기반으로 PET를 예측합니다.")
 
-# 지도 생성
+# 지도 생성 및 출력
 center = [35.2325, 129.0840]
 m = folium.Map(location=center, zoom_start=17)
-
+folium.ClickForMarker(popup="선택 위치").add_to(m)
 map_data = st_folium(m, height=500, returned_objects=["last_clicked"], use_container_width=True)
 
 # 클릭 이벤트 처리
 if map_data and "last_clicked" in map_data and map_data["last_clicked"] is not None:
     clicked_lat = map_data["last_clicked"]["lat"]
     clicked_lon = map_data["last_clicked"]["lng"]
-
-    # 선택 위치 마커 표시
-    folium.Marker(
-        [clicked_lat, clicked_lon],
-        tooltip="선택 위치",
-        icon=folium.Icon(color="red")
-    ).add_to(m)
-    st_folium(m, height=500, returned_objects=[], use_container_width=True)
 
     # 가장 가까운 지점 탐색
     nearest = find_nearest_point(clicked_lat, clicked_lon, df)
@@ -153,13 +145,25 @@ if map_data and "last_clicked" in map_data and map_data["last_clicked"] is not N
 
         # 결과 출력
         st.subheader("📌 예측 결과")
-        st.write(f"**선택 위치:** {clicked_lat:.5f}, {clicked_lon:.5f}")
-        st.write(f"**가장 가까운 지점:** {nearest['Location_Name']} (거리: {nearest['distance']:.1f} m)")
-        st.write(f"**실시간 기온:** {temp:.1f}°C, **습도:** {hum:.0f}%, **풍속:** {wind:.1f} m/s")
 
-        # SVF, GVI, BVI 출력
-        st.write(f"**SVF:** {nearest['SVF']:.3f}, **GVI:** {nearest['GVI']:.3f}, **BVI:** {nearest['BVI']:.3f}")
+        st.markdown(f"**🗺️ 선택 위치:** `{clicked_lat:.5f}, {clicked_lon:.5f}`")
+        st.markdown(f"**📍 가장 가까운 지점:** `{nearest['Location_Name']}` (거리: `{nearest['distance']:.1f} m`)")
 
-        st.markdown(f"### 🧠 예측 PET: `{pet:.1f}°C`")
+        st.markdown("### 📊 실측 데이터")
+        st.markdown(f"- **SVF:** {nearest['SVF']:.3f}")
+        st.markdown(f"- **GVI:** {nearest['GVI']:.3f}")
+        st.markdown(f"- **BVI:** {nearest['BVI']:.3f}")
+        st.markdown(f"- **온도:** {nearest['AirTemperature']:.1f}°C")
+        st.markdown(f"- **습도:** {nearest['Humidity']:.0f}%")
+        st.markdown(f"- **풍속:** {nearest['WindSpeed']:.1f} m/s")
+
+        st.markdown("### ☁️ 실시간 기상청 데이터")
+        st.markdown(f"- **기온:** {temp:.1f}°C")
+        st.markdown(f"- **습도:** {hum:.0f}%")
+        st.markdown(f"- **풍속:** {wind:.1f} m/s")
+
+        st.markdown("### 🌡️ 예측 PET")
+        st.markdown(f"**👉 `{pet:.1f}°C`**")
+
     else:
         st.warning("⚠️ 실시간 기상 데이터를 불러올 수 없습니다.")
