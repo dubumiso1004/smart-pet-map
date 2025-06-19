@@ -6,7 +6,6 @@ import numpy as np
 from geopy.distance import geodesic
 import requests
 import datetime
-import math
 
 # ---------------------------
 # 1. 실측 데이터 불러오기
@@ -18,7 +17,7 @@ def load_data():
     def dms_to_decimal(dms_str):
         try:
             d, m, s = [float(x) for x in dms_str.split(";")]
-            return d + m / 60 + s / 3600
+            return d + m/60 + s/3600
         except:
             return None
 
@@ -29,21 +28,54 @@ def load_data():
 df = load_data()
 
 # ---------------------------
-# 2. 가장 가까운 측정지점 찾기
+# 2. 가장 가까운 지점 찾기
 # ---------------------------
 def find_nearest_point(lat_clicked, lon_clicked, df):
     df["distance"] = df.apply(
-        lambda row: geodesic((lat_clicked, lon_clicked), (row["Lat_decimal"], row["Lon_decimal"])).meters,
+        lambda row: geodesic((lat_clicked, lon_clicked), (row["Lat_decimal"], row["Lon_decimal"]))
+        .meters,
         axis=1
     )
     return df.sort_values("distance").iloc[0]
 
 # ---------------------------
-# 3. 위경도 → 기상청 격자 변환
+# 3. 기상청 API 기반 실시간 날씨
+# ---------------------------
+def get_weather_kma(nx, ny):
+    try:
+        service_key = "A31pZ0%2FUXicpgY0R38O7jPVsY6%2FdplQ%2FPTmiPKsh60m1UQ1hi57a%2B%2Bs7CkLJgOlCWgFxadK2vn33spFyP4%2F0gw%3D%3D"
+        now = datetime.datetime.now()
+        base_date = now.strftime("%Y%m%d")
+        hour = now.hour
+        if now.minute < 45:
+            hour -= 1
+        base_time = f"{hour:02}00"
+
+        url = f"http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtNcst?serviceKey={service_key}&numOfRows=100&pageNo=1&dataType=JSON&base_date={base_date}&base_time={base_time}&nx={nx}&ny={ny}"
+        res = requests.get(url)
+        data = res.json()
+
+        items = data['response']['body']['items']['item']
+        temp = hum = wind = None
+        for item in items:
+            if item['category'] == 'T1H':
+                temp = float(item['obsrValue'])
+            elif item['category'] == 'REH':
+                hum = float(item['obsrValue'])
+            elif item['category'] == 'WSD':
+                wind = float(item['obsrValue'])
+
+        return temp, hum, wind
+    except:
+        return None, None, None
+
+# ---------------------------
+# 4. 격자 변환 함수 (위경도 → nx, ny)
 # ---------------------------
 def convert_to_grid(lat, lon):
-    RE = 6371.00877  # 지구 반지름(km)
-    GRID = 5.0       # 격자 간격(km)
+    import math
+    RE = 6371.00877
+    GRID = 5.0
     SLAT1 = 30.0
     SLAT2 = 60.0
     OLON = 126.0
@@ -79,42 +111,7 @@ def convert_to_grid(lat, lon):
     return int(x), int(y)
 
 # ---------------------------
-# 4. 기상청 실시간 날씨 불러오기
-# ---------------------------
-def get_weather_kma(nx, ny):
-    try:
-        service_key = "A31pZ0%2FUXicpgY0R38O7jPVsY6%2FdplQ%2FPTmiPKsh60m1UQ1hi57a%2B%2Bs7CkLJgOlCWgFxadK2vn33spFyP4%2F0gw%3D%3D"
-        now = datetime.datetime.now()
-        base_date = now.strftime("%Y%m%d")
-        hour = now.hour
-        if now.minute < 45:
-            hour -= 1
-        base_time = f"{hour:02}00"
-
-        url = (
-            f"http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtNcst"
-            f"?serviceKey={service_key}&numOfRows=100&pageNo=1&dataType=JSON"
-            f"&base_date={base_date}&base_time={base_time}&nx={nx}&ny={ny}"
-        )
-        res = requests.get(url)
-        data = res.json()
-
-        items = data['response']['body']['items']['item']
-        temp = hum = wind = None
-        for item in items:
-            if item['category'] == 'T1H':
-                temp = float(item['obsrValue'])
-            elif item['category'] == 'REH':
-                hum = float(item['obsrValue'])
-            elif item['category'] == 'WSD':
-                wind = float(item['obsrValue'])
-
-        return temp, hum, wind
-    except:
-        return None, None, None
-
-# ---------------------------
-# 5. PET 예측 수식 (기초 회귀 모델)
+# 5. PET 예측 수식 (기초 회귀모델)
 # ---------------------------
 def predict_pet(svf, gvi, bvi, temp, hum, wind):
     return temp + (1 - svf) * 5 - gvi * 2 + bvi * 1.5 - wind * 0.5 + hum * 0.03
@@ -129,11 +126,11 @@ st.markdown("지도를 클릭하면 가장 가까운 측정지점의 실측값�
 # 지도 생성
 center = [35.2325, 129.0840]
 m = folium.Map(location=center, zoom_start=17)
-folium.ClickForMarker(popup="선택 위치").add_to(m)
+m.add_child(folium.LatLngPopup())
 map_data = st_folium(m, height=500, returned_objects=["last_clicked"])
 
 # 클릭 이벤트 처리
-if map_data and "last_clicked" in map_data and map_data["last_clicked"]:
+if map_data and map_data.get("last_clicked"):
     lat = map_data["last_clicked"]["lat"]
     lon = map_data["last_clicked"]["lng"]
 
