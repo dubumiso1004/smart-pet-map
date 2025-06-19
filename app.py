@@ -6,6 +6,7 @@ import numpy as np
 from geopy.distance import geodesic
 import requests
 import datetime
+import math
 
 # ---------------------------
 # 1. 실측 데이터 불러오기
@@ -69,10 +70,9 @@ def get_weather_kma(nx, ny):
         return None, None, None
 
 # ---------------------------
-# 4. 격자 변환 함수 (위경도 → nx, ny)
+# 4. 위경도 → 기상청 격자 변환 함수
 # ---------------------------
 def convert_to_grid(lat, lon):
-    import math
     RE = 6371.00877
     GRID = 5.0
     SLAT1 = 30.0
@@ -110,7 +110,7 @@ def convert_to_grid(lat, lon):
     return int(x), int(y)
 
 # ---------------------------
-# 5. PET 예측 수식 (기초 회귀모델)
+# 5. PET 예측 수식
 # ---------------------------
 def predict_pet(svf, gvi, bvi, temp, hum, wind):
     return temp + (1 - svf) * 5 - gvi * 2 + bvi * 1.5 - wind * 0.5 + hum * 0.03
@@ -122,14 +122,18 @@ st.set_page_config(layout="centered")
 st.title("📍 지도 기반 실측 + 기상청 실시간 PET 예측 시스템")
 st.markdown("지도를 클릭하면 가장 가까운 측정지점의 실측값과 **기상청 실시간 날씨**를 기반으로 PET를 예측합니다.")
 
-# 지도 생성
+# 지도 생성 및 클릭 이벤트 설정
 center = [35.2325, 129.0840]
 m = folium.Map(location=center, zoom_start=17)
 m.add_child(folium.LatLngPopup())
-map_data = st_folium(m, height=500, returned_objects=["last_clicked"])
+folium.ClickForMarker(popup="선택 위치").add_to(m)  # ✅ 클릭 마커 추가
 
-# 클릭 이벤트 처리
-if map_data and map_data.get("last_clicked"):
+map_data = st_folium(m, height=500, returned_objects=["last_clicked"], use_container_width=True)
+
+# 디버깅용 출력 (필요 시 주석 해제)
+# st.write(map_data)
+
+if map_data and map_data.get("last_clicked") is not None:
     lat = map_data["last_clicked"]["lat"]
     lon = map_data["last_clicked"]["lng"]
 
@@ -140,7 +144,6 @@ if map_data and map_data.get("last_clicked"):
     st.markdown("### 📌 선택된 위치")
     st.markdown(f"위도: `{lat:.5f}`, 경도: `{lon:.5f}`")
 
-    # 실측 데이터 출력
     st.markdown("### 📍 가장 가까운 측정지점 (실측 데이터)")
     st.markdown(f"""
     - **ID**: `{nearest['ID']}`  
@@ -155,7 +158,6 @@ if map_data and map_data.get("last_clicked"):
     - **실측 PET**: `{nearest['PET']:.2f} ℃`
     """)
 
-    # 실시간 날씨 출력
     if temp_now is not None:
         st.markdown("### 🌐 실시간 기상청 데이터")
         st.markdown(f"""
@@ -163,7 +165,6 @@ if map_data and map_data.get("last_clicked"):
         - **습도**: `{hum_now:.1f} %`  
         - **풍속**: `{wind_now:.1f} m/s`
         """)
-
         pet_estimated = predict_pet(
             nearest['SVF'], nearest['GVI'], nearest['BVI'],
             temp_now, hum_now, wind_now
