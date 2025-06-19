@@ -32,9 +32,9 @@ def get_weather(lat, lon):
     try:
         url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={API_KEY}&units=metric"
         response = requests.get(url).json()
-        air_temp = response["main"]["temp"]
-        humidity = response["main"]["humidity"]
-        wind_speed = response["wind"]["speed"]
+        air_temp = response.get("main", {}).get("temp", None)
+        humidity = response.get("main", {}).get("humidity", None)
+        wind_speed = response.get("wind", {}).get("speed", None)
         return air_temp, humidity, wind_speed
     except:
         return None, None, None
@@ -68,7 +68,7 @@ if map_result and map_result.get("last_clicked"):
 
     air_temp, humidity, wind_speed = get_weather(lat, lon)
 
-    if air_temp is not None:
+    if None not in (air_temp, humidity, wind_speed):
         st.write(f"🌤️ 기온: {air_temp}°C / 💧 습도: {humidity}% / 🍃 풍속: {wind_speed} m/s")
         pet = predict_pet(svf, gvi, bvi, air_temp, humidity, wind_speed)
         st.success(f"🔥 예측된 PET: {pet:.2f} °C")
