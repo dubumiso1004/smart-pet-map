@@ -32,11 +32,13 @@ def get_weather(lat, lon):
     try:
         url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={API_KEY}&units=metric"
         response = requests.get(url).json()
+        st.json(response)  # 전체 응답 출력
         air_temp = response.get("main", {}).get("temp", None)
         humidity = response.get("main", {}).get("humidity", None)
         wind_speed = response.get("wind", {}).get("speed", None)
         return air_temp, humidity, wind_speed
-    except:
+    except Exception as e:
+        st.warning(f"API 요청 오류: {e}")
         return None, None, None
 
 # ----------------------- PET 예측 함수 -----------------------
