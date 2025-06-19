@@ -1,80 +1,48 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import joblib
-from geopy.distance import geodesic
+import shap
+import matplotlib.pyplot as plt
 
-# ---------------------------
-# 1. 실측 데이터 불러오기
-# ---------------------------
-@st.cache_data
-def load_data():
-    df = pd.read_excel("total_svf_gvi_bvi_250613.xlsx")
-
-    def dms_to_decimal(dms_str):
-        try:
-            d, m, s = [float(x) for x in dms_str.split(";")]
-            return d + m/60 + s/3600
-        except:
-            return None
-
-    df["Lat_decimal"] = df["Lat"].apply(dms_to_decimal)
-    df["Lon_decimal"] = df["Lon"].apply(dms_to_decimal)
-    return df
-
-# ---------------------------
-# 2. 가장 가까운 측정지점 찾기
-# ---------------------------
-def find_nearest_point(lat, lon, df):
-    clicked_point = (lat, lon)
-    df["Distance"] = df.apply(lambda row: geodesic(clicked_point, (row["Lat_decimal"], row["Lon_decimal"])).meters, axis=1)
-    return df.loc[df["Distance"].idxmin()]
-
-# ---------------------------
-# 3. 모델 불러오기
-# ---------------------------
+# 모델 로딩
 @st.cache_resource
 def load_model():
-    return joblib.load("pet_predict_rf_model.pkl")
+    return joblib.load("pet_rf_model_full.pkl")  # ← 파일명 수정됨
 
-# ---------------------------
-# 4. Streamlit 메인 함수
-# ---------------------------
-def main():
-    st.title("🌡️ AI 기반 PET 예측 시스템")
-    st.markdown("위도, 경도 기반으로 SVF, GVI, BVI 및 기상데이터를 활용한 PET 예측")
+model = load_model()
 
-    df = load_data()
-    model = load_model()
+# 페이지 제목
+st.markdown("🎯 **AI 기반 PET 예측 시스템**")
+st.markdown("위도, 경도 기반으로 SVF, GVI, BVI 및 기상데이터를 활용한 PET 예측")
 
-    lat = st.number_input("위도 입력 (예: 35.232)", value=35.232, format="%.6f")
-    lon = st.number_input("경도 입력 (예: 129.084)", value=129.084, format="%.6f")
+# 사용자 입력
+svf = st.slider("SVF (Sky View Factor)", 0.0, 1.0, 0.5, 0.01)
+gvi = st.slider("GVI (Green View Index)", 0.0, 1.0, 0.3, 0.01)
+bvi = st.slider("BVI (Building View Index)", 0.0, 1.0, 0.3, 0.01)
+temp = st.slider("기온 (°C)", 10.0, 40.0, 25.0, 0.5)
+humidity = st.slider("습도 (%)", 10.0, 100.0, 60.0, 1.0)
+wind = st.slider("풍속 (m/s)", 0.0, 10.0, 1.0, 0.1)
 
-    if st.button("PET 예측하기"):
-        nearest = find_nearest_point(lat, lon, df)
+# 입력 데이터프레임 구성
+input_df = pd.DataFrame({
+    "SVF": [svf],
+    "GVI": [gvi],
+    "BVI": [bvi],
+    "AirTemperature": [temp],
+    "Humidity": [humidity],
+    "WindSpeed": [wind],
+})
 
-        svf = nearest["SVF"]
-        gvi = nearest["GVI"]
-        bvi = nearest["BVI"]
-        temp = nearest["AirTemperature"]
-        hum = nearest["Humidity"]
-        wind = nearest["WindSpeed"]
+# PET 예측
+prediction = model.predict(input_df)[0]
+st.success(f"예측된 PET: **{prediction:.2f} °C**")
 
-        input_data = pd.DataFrame([{
-            "SVF": svf,
-            "GVI": gvi,
-            "BVI": bvi,
-            "AirTemperature": temp,
-            "Humidity": hum,
-            "WindSpeed": wind
-        }])
+# SHAP 해석 (CPU 기반)
+st.markdown("📊 **변수 영향력 분석 (SHAP)**")
+explainer = shap.Explainer(model.predict, input_df, algorithm="permutation")
+shap_values = explainer(input_df)
 
-        predicted_pet = model.predict(input_data)[0]
+fig, ax = plt.subplots()
+shap.summary_plot(shap_values, input_df, show=False)
+st.pyplot(fig)
 
-        st.subheader("📍 예측 결과")
-        st.markdown(f"**SVF:** {svf:.3f}, **GVI:** {gvi:.3f}, **BVI:** {bvi:.3f}")
-        st.markdown(f"**기온:** {temp:.1f}℃, **습도:** {hum:.1f}%, **풍속:** {wind:.1f} m/s")
-        st.success(f"👉 예측 PET: **{predicted_pet:.2f}℃**")
-
-if __name__ == "__main__":
-    main()
