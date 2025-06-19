@@ -1,77 +1,80 @@
 import streamlit as st
 import pandas as pd
-import joblib
-import requests
-from streamlit_folium import st_folium
-import folium
+import numpy as np
 
-# 설정
-st.set_page_config(layout="wide")
-st.title("🌡️ 스마트 PET 예측 지도")
+# 예시용 함수 (실제 모델로 교체 가능)
+def predict_svf(lat, lon):
+    return np.clip(0.3 + 0.1 * np.sin(lat + lon), 0, 1)
 
-# ----------------------- 모델 & 데이터 로드 -----------------------
-model = joblib.load("pet_rf_model_full.pkl")
+def predict_gvi(lat, lon):
+    return np.clip(0.2 + 0.15 * np.cos(lat), 0, 1)
 
-def dms_to_decimal(dms_str):
-    try:
-        parts = list(map(float, str(dms_str).split(";")))
-        return parts[0] + parts[1]/60 + parts[2]/3600
-    except:
-        return None
+def predict_bvi(lat, lon):
+    return np.clip(0.5 - 0.1 * np.cos(lon), 0, 1)
 
-# 엑셀 불러오기 및 좌표 변환
-df = pd.read_excel("total_svf_gvi_bvi_250613.xlsx")
-df = df.dropna(subset=["Lat", "Lon", "SVF", "GVI", "BVI"])
-df["Lat_decimal"] = df["Lat"].apply(dms_to_decimal)
-df["Lon_decimal"] = df["Lon"].apply(dms_to_decimal)
+def predict_pet(svf, gvi, bvi, temp, humidity, wind):
+    # 예시용 PET 계산식 (실제 모델로 대체)
+    return temp + (1 - svf) * 5 - gvi * 2 + bvi * 1.5 - wind * 0.5 + humidity * 0.03
 
-# ----------------------- 실시간 날씨 API -----------------------
-API_KEY = "2ced117aca9b446ae43cf82401d542a8"
+# Streamlit UI
+st.title("📍 위치 기반 PET 예측 시스템")
+st.markdown("지도를 클릭하면 SVF, GVI, BVI를 기반으로 PET를 예측합니다.")
 
-def get_weather(lat, lon):
-    try:
-        url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={API_KEY}&units=metric"
-        response = requests.get(url).json()
-        air_temp = response.get("main", {}).get("temp", None)
-        humidity = response.get("main", {}).get("humidity", None)
-        wind_speed = response.get("wind", {}).get("speed", None)
-        return air_temp, humidity, wind_speed
-    except Exception as e:
-        st.warning(f"API 요청 오류: {e}")
-        return None, None, None
+# 지도에서 위치 입력받기
+location = st.text_input("위치를 입력하거나 클릭해보세요 (예: 부산대학교)", "부산대학교")
+lat = st.number_input("위도", value=35.2325, format="%.6f")
+lon = st.number_input("경도", value=129.0840, format="%.6f")
 
-# ----------------------- PET 예측 함수 -----------------------
-def predict_pet(svf, gvi, bvi, temp, humid, wind):
-    X = pd.DataFrame([[svf, gvi, bvi, temp, humid, wind]], columns=["SVF", "GVI", "BVI", "AirTemperature", "Humidity", "WindSpeed"])
-    return model.predict(X)[0]
+# 실시간 기상값 (예: OpenWeather API로 대체 가능)
+temperature = 26.8  # ℃
+humidity = 65       # %
+wind_speed = 5.1    # m/s
 
-# ----------------------- 가장 가까운 지점의 시각요소 추출 -----------------------
-def get_nearest_visuals(lat, lon):
-    df["distance"] = ((df["Lat_decimal"] - lat)**2 + (df["Lon_decimal"] - lon)**2)**0.5
-    nearest = df.loc[df["distance"].idxmin()]
-    return nearest["SVF"], nearest["GVI"], nearest["BVI"]
+if st.button("예측하기"):
+    # 예측
+    svf = predict_svf(lat, lon)
+    gvi = predict_gvi(lat, lon)
+    bvi = predict_bvi(lat, lon)
+    predicted_pet = predict_pet(svf, gvi, bvi, temperature, humidity, wind_speed)
 
-# ----------------------- 지도 출력 -----------------------
-st.markdown("### 🗺️ 지도에서 위치를 클릭하세요")
-start_coords = [35.2335, 129.0796]  # 부산대학교 위치
-m = folium.Map(location=start_coords, zoom_start=16)
-m.add_child(folium.LatLngPopup())
-map_result = st_folium(m, height=500, width=700)
+    # 결과 출력 (모바일 대응 최적화)
+    st.markdown(f"""
+    ### 📍 선택한 위치 정보
+    - 위도: **{lat:.4f}**
+    - 경도: **{lon:.4f}**
 
-# ----------------------- 클릭 이벤트 처리 -----------------------
-if map_result and map_result.get("last_clicked"):
-    lat = map_result["last_clicked"]["lat"]
-    lon = map_result["last_clicked"]["lng"]
-    st.success(f"📍 선택된 위치: {lat:.5f}, {lon:.5f}")
+    ### 🌡 기상 정보
+    - 기온: **{temperature} ℃**
+    - 습도: **{humidity} %**
+    - 풍속: **{wind_speed} m/s**
 
-    svf, gvi, bvi = get_nearest_visuals(lat, lon)
-    st.write(f"🪟 SVF: {svf:.3f} / 🌿 GVI: {gvi:.3f} / 🏢 BVI: {bvi:.3f}")
+    ### 🌿 시각 환경 지표
+    - SVF: **{svf:.3f}**
+    - GVI: **{gvi:.3f}**
+    - BVI: **{bvi:.3f}**
 
-    air_temp, humidity, wind_speed = get_weather(lat, lon)
+    ### 🔥 예측 PET 결과
+    - 체감온도(PET): **{predicted_pet:.2f} ℃**
+    """)
 
-    if None not in (air_temp, humidity, wind_speed):
-        st.write(f"🌤️ 기온: {air_temp}°C / 💧 습도: {humidity}% / 🍃 풍속: {wind_speed} m/s")
-        pet = predict_pet(svf, gvi, bvi, air_temp, humidity, wind_speed)
-        st.success(f"🔥 예측된 PET: {pet:.2f} °C")
-    else:
-        st.warning("⚠️ 실시간 기상 데이터를 불러올 수 없습니다.")
+# 지도 시각화 (선택사항)
+import pydeck as pdk
+
+st.pydeck_chart(pdk.Deck(
+    map_style=None,
+    initial_view_state=pdk.ViewState(
+        latitude=lat,
+        longitude=lon,
+        zoom=15,
+        pitch=45,
+    ),
+    layers=[
+        pdk.Layer(
+            'ScatterplotLayer',
+            data=pd.DataFrame({'lat': [lat], 'lon': [lon]}),
+            get_position='[lon, lat]',
+            get_color='[255, 0, 0, 160]',
+            get_radius=20,
+        ),
+    ],
+))
