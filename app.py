@@ -53,7 +53,7 @@ def get_nearest_visuals(lat, lon):
 
 # ----------------------- 지도 출력 -----------------------
 st.markdown("### 🗺️ 지도에서 위치를 클릭하세요")
-start_coords = [35.1796, 129.0756]  # 부산 중심
+start_coords = [35.2335, 129.0796]  # 부산대학교 위치
 m = folium.Map(location=start_coords, zoom_start=16)
 m.add_child(folium.LatLngPopup())
 map_result = st_folium(m, height=500, width=700)
