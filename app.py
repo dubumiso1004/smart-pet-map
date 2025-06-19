@@ -12,14 +12,14 @@ import requests
 @st.cache_data
 def load_data():
     df = pd.read_excel("total_svf_gvi_bvi_250613.xlsx")
-    
+
     def dms_to_decimal(dms_str):
         try:
             d, m, s = [float(x) for x in dms_str.split(";")]
             return d + m/60 + s/3600
         except:
             return None
-    
+
     df["Lat_decimal"] = df["Lat"].apply(dms_to_decimal)
     df["Lon_decimal"] = df["Lon"].apply(dms_to_decimal)
     return df
@@ -81,7 +81,7 @@ if map_data and map_data.get("last_clicked"):
     temp_now, hum_now, wind_now = get_weather(lat, lon, api_key)
 
     # 📍 위치 표시
-    st.success(f"✅ 클릭된 위치: 위도 {lat:.5f}, 경도 {lon:.5f}")
+    st.success(f"✅ 위치 선택됨: 위도 {lat:.5f}, 경도 {lon:.5f}")
 
     # 실측 데이터 출력
     st.markdown("### 📍 가장 가까운 측정지점 (실측 데이터)")
@@ -106,15 +106,15 @@ if map_data and map_data.get("last_clicked"):
         - **습도**: `{hum_now:.1f} %`  
         - **풍속**: `{wind_now:.1f} m/s`
         """)
-        
+
         # 실시간 PET 예측
         pet_estimated = predict_pet(
             nearest['SVF'], nearest['GVI'], nearest['BVI'],
             temp_now, hum_now, wind_now
         )
         st.markdown("### 🔥 예측 PET (실시간 기상 기반)")
-        st.markdown(f"- PET 예측값: `{pet_estimated:.2f} ℃`")
+        st.markdown(f"- 예측 PET: `{pet_estimated:.2f} ℃`")
     else:
         st.warning("⚠️ 실시간 기상 데이터를 가져오지 못했습니다.")
 else:
-    st.info("🖱 지도에서 예측할 위치를 클릭하세요.")
+    st.info("🖱 지도에서 위치를 클릭해주세요.")
