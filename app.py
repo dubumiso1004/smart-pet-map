@@ -18,7 +18,7 @@ def load_data():
     def dms_to_decimal(dms_str):
         try:
             d, m, s = [float(x) for x in dms_str.split(";")]
-            return d + m/60 + s/3600
+            return d + m / 60 + s / 3600
         except:
             return None
 
@@ -33,8 +33,7 @@ df = load_data()
 # ---------------------------
 def find_nearest_point(lat_clicked, lon_clicked, df):
     df["distance"] = df.apply(
-        lambda row: geodesic((lat_clicked, lon_clicked), (row["Lat_decimal"], row["Lon_decimal"]))
-        .meters,
+        lambda row: geodesic((lat_clicked, lon_clicked), (row["Lat_decimal"], row["Lon_decimal"])).meters,
         axis=1
     )
     return df.sort_values("distance").iloc[0]
@@ -129,27 +128,26 @@ m = folium.Map(location=center, zoom_start=17)
 folium.ClickForMarker(popup="선택 위치").add_to(m)
 map_data = st_folium(m, height=500, returned_objects=["last_clicked"], use_container_width=True)
 
-# 클릭 이벤트 처리 후 결과 바로 출력
+# 클릭 이벤트 처리
 if map_data and "last_clicked" in map_data and map_data["last_clicked"] is not None:
     clicked_lat = map_data["last_clicked"]["lat"]
     clicked_lon = map_data["last_clicked"]["lng"]
 
-    # 가장 가까운 지점 찾기
+    # 가장 가까운 지점 탐색
     nearest = find_nearest_point(clicked_lat, clicked_lon, df)
 
-    # 격자 좌표 변환 후 실시간 기상 데이터
+    # 격자 변환 및 기상 데이터 가져오기
     nx, ny = convert_to_grid(clicked_lat, clicked_lon)
     temp, hum, wind = get_weather_kma(nx, ny)
 
     if None not in [temp, hum, wind]:
-        # PET 예측
         pet = predict_pet(nearest["SVF"], nearest["GVI"], nearest["BVI"], temp, hum, wind)
 
         # 결과 출력
         st.subheader("📌 예측 결과")
         st.write(f"**선택 위치:** {clicked_lat:.5f}, {clicked_lon:.5f}")
-        st.write(f"**가장 가까운 지점:** {nearest['name']} (거리: {nearest['distance']:.1f}m)")
-        st.write(f"**실시간 기온:** {temp:.1f}°C, **습도:** {hum:.0f}%, **풍속:** {wind:.1f}m/s")
+        st.write(f"**가장 가까운 지점:** {nearest['Location_Name']} (거리: {nearest['distance']:.1f} m)")
+        st.write(f"**실시간 기온:** {temp:.1f}°C, **습도:** {hum:.0f}%, **풍속:** {wind:.1f} m/s")
         st.markdown(f"### 🧠 예측 PET: `{pet:.1f}°C`")
     else:
-        st.warning("실시간 기상 데이터를 불러오지 못했습니다.")
+        st.warning("⚠️ 실시간 기상 데이터를 불러올 수 없습니다.")
