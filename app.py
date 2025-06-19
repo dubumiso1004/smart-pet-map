@@ -45,7 +45,10 @@ def get_weather_kma(nx, ny):
         service_key = "A31pZ0%2FUXicpgY0R38O7jPVsY6%2FdplQ%2FPTmiPKsh60m1UQ1hi57a%2B%2Bs7CkLJgOlCWgFxadK2vn33spFyP4%2F0gw%3D%3D"
         now = datetime.datetime.now()
         base_date = now.strftime("%Y%m%d")
-        base_time = now.strftime("%H00")
+        hour = now.hour
+        if now.minute < 45:
+            hour -= 1
+        base_time = f"{hour:02}00"
 
         url = f"http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtNcst?serviceKey={service_key}&numOfRows=100&pageNo=1&dataType=JSON&base_date={base_date}&base_time={base_time}&nx={nx}&ny={ny}"
         res = requests.get(url)
@@ -116,7 +119,7 @@ def predict_pet(svf, gvi, bvi, temp, hum, wind):
 # 6. Streamlit 앱 실행
 # ---------------------------
 st.set_page_config(layout="centered")
-st.title("📍 지도 기반 실측 + 실시간 PET 예측 시스템")
+st.title("📍 지도 기반 실측 + 기상청 실시간 PET 예측 시스템")
 st.markdown("지도를 클릭하면 가장 가까운 측정지점의 실측값과 **기상청 실시간 날씨**를 기반으로 PET를 예측합니다.")
 
 # 지도 생성
