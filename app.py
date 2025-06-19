@@ -128,24 +128,20 @@ m = folium.Map(location=center, zoom_start=17)
 folium.ClickForMarker(popup="선택 위치").add_to(m)
 map_data = st_folium(m, height=500, returned_objects=["last_clicked"], use_container_width=True)
 
-# 클릭 이벤트 처리
+# 지도 아래에 결과 출력
 if map_data and "last_clicked" in map_data and map_data["last_clicked"] is not None:
     clicked_lat = map_data["last_clicked"]["lat"]
     clicked_lon = map_data["last_clicked"]["lng"]
 
-    # 가장 가까운 지점 탐색
     nearest = find_nearest_point(clicked_lat, clicked_lon, df)
-
-    # 격자 변환 및 기상 데이터 가져오기
     nx, ny = convert_to_grid(clicked_lat, clicked_lon)
     temp, hum, wind = get_weather_kma(nx, ny)
 
     if None not in [temp, hum, wind]:
         pet = predict_pet(nearest["SVF"], nearest["GVI"], nearest["BVI"], temp, hum, wind)
 
-        # 결과 출력
+        st.markdown("---")
         st.subheader("📌 예측 결과")
-
         st.markdown(f"**🗺️ 선택 위치:** `{clicked_lat:.5f}, {clicked_lon:.5f}`")
         st.markdown(f"**📍 가장 가까운 지점:** `{nearest['Location_Name']}` (거리: `{nearest['distance']:.1f} m`)")
 
