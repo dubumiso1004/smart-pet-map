@@ -1,6 +1,8 @@
 streamlit
-streamlit-folium
 pandas
+scikit-learn
+folium
+streamlit-folium
 openpyxl
-geopy
 requests
+joblib
